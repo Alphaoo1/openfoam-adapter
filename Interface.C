@@ -321,7 +321,50 @@ void preciceAdapter::Interface::configureMesh(const fvMesh& mesh)
         // Pass the mesh vertices information to preCICE
         precice_.setMeshVertices(meshID_, numDataLocations_, vertices, vertexIDs_);
     }
-else
+    else if (locationsType_ == "volSurf")
+    {
+        // module for volume coupling is based on the module for coupling faceCenters
+
+        // get the number (face centered) mesh points in the volume internal surfaces 
+        numDataLocations_ = mesh.Cf().size();
+
+        for (uint j = 0; j < patchIDs_.size(); j++)
+        {
+            numDataLocations_ +=
+                    mesh.boundaryMesh()[patchIDs_.at(j)].faceCentres().size();
+        }
+        DEBUG(adapterInfo("Number of face centres: " + std::to_string(numDataLocations_)));
+
+        double vertices[dim_ * numDataLocations_];
+
+        vertexIDs_ = new int[numDataLocations_];
+
+        // Initialize the index of the vertices array
+	int verticesIndex = 0;
+
+        // Get the locations of the volume centered mesh vertices
+	const vectorField & FaceCenters = mesh.Cf();
+
+        for (int i = 0; i < FaceCenters.size(); i++)
+            for (unsigned int d = 0; d < dim_; ++d)
+              vertices[verticesIndex++] = FaceCenters[i][d];
+
+        for (uint j = 0; j < patchIDs_.size(); j++)
+        {
+            // Get the face centers of the current patch
+	    const vectorField & faceCenters =
+                    mesh.boundaryMesh()[patchIDs_.at(j)].faceCentres();
+
+            // Assign the (x,y,z) locations to the vertices
+	    for (int i = 0; i < faceCenters.size(); i++)
+                for (unsigned int d = 0; d < dim_; ++d)
+                  vertices[verticesIndex++] = faceCenters[i][d];
+        }
+
+        // Pass the mesh vertices information to preCICE
+	precice_.setMeshVertices(meshID_, numDataLocations_, vertices, vertexIDs_);
+    }
+    else
     {
         FatalErrorInFunction
             << "ERROR: interface points location type "
